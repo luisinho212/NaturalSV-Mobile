@@ -10,8 +10,12 @@ import {
   View,
 } from 'react-native';
 import UsuariosScreen from './usuarios';
+import ClientesScreen from './clientes';
+
 export default function App() {
-  const [screen, setScreen] = useState<'login' | 'menu' | 'usuarios'>('login');
+  const [screen, setScreen] = useState<
+    'login' | 'menu' | 'usuarios' | 'clientes'
+  >('login');
   
   // Estados para Login y Validaciones
   const [usuario, setUsuario] = useState('');
@@ -37,8 +41,12 @@ export default function App() {
     setPassword('');
     setScreen('login');
   };
-if (screen === 'usuarios') {
+  if (screen === 'usuarios') {
     return <UsuariosScreen onRegresar={() => setScreen('menu')} />;
+  }
+
+  if (screen === 'clientes') {
+    return <ClientesScreen onRegresar={() => setScreen('menu')} />;
   }
   if (screen === 'menu') {
     return (
@@ -50,7 +58,9 @@ if (screen === 'usuarios') {
           <Text style={styles.menuTitle}>Menu</Text>
 
           <View style={styles.menuButtonsGroup}>
-            <TouchableOpacity style={styles.btnMenuOption}>
+            <TouchableOpacity
+              style={styles.btnMenuOption}
+              onPress={() => setScreen('clientes')}>
               <Text style={styles.btnMenuOptionText}>Clientes</Text>
             </TouchableOpacity>
 
