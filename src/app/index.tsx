@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import UsuariosScreen from './usuarios';
 import ClientesScreen from './clientes';
+import ProductosScreen from './productos';
 
 export default function App() {
   const [screen, setScreen] = useState<
-    'login' | 'menu' | 'usuarios' | 'clientes'
-  >('login');
+  'login' | 'menu' | 'usuarios' | 'clientes' | 'productos'
+>('login');
   
   // Estados para Login y Validaciones
   const [usuario, setUsuario] = useState('');
@@ -48,6 +49,10 @@ export default function App() {
   if (screen === 'clientes') {
     return <ClientesScreen onRegresar={() => setScreen('menu')} />;
   }
+
+  if (screen === 'productos') {
+  return <ProductosScreen onRegresar={() => setScreen('menu')} />;
+}
   if (screen === 'menu') {
     return (
       <SafeAreaView style={styles.container}>
@@ -68,7 +73,9 @@ export default function App() {
               <Text style={styles.btnMenuOptionText}>Compras</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.btnMenuOption}>
+            <TouchableOpacity
+              style={styles.btnMenuOption}
+              onPress={() => setScreen('productos')}>
               <Text style={styles.btnMenuOptionText}>Productos</Text>
             </TouchableOpacity>
 
