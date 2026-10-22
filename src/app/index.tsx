@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
   Alert,
   SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import UsuariosScreen from './usuarios';
 import ClientesScreen from './clientes';
 
 export default function App() {
-  const [screen, setScreen] = useState<'login' | 'menu' | 'clientes'>('login');
+  const [screen, setScreen] = useState<
+    'login' | 'menu' | 'usuarios' | 'clientes'
+  >('login');
   
   // Estados para Login y Validaciones
   const [usuario, setUsuario] = useState('');
@@ -38,11 +41,13 @@ export default function App() {
     setPassword('');
     setScreen('login');
   };
+  if (screen === 'usuarios') {
+    return <UsuariosScreen onRegresar={() => setScreen('menu')} />;
+  }
 
   if (screen === 'clientes') {
     return <ClientesScreen onRegresar={() => setScreen('menu')} />;
   }
-
   if (screen === 'menu') {
     return (
       <SafeAreaView style={styles.container}>
@@ -67,9 +72,9 @@ export default function App() {
               <Text style={styles.btnMenuOptionText}>Productos</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.btnMenuOption}>
-              <Text style={styles.btnMenuOptionText}>Usuarios</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.btnMenuOption} onPress={() => setScreen('usuarios')}>
+            <Text style={styles.btnMenuOptionText}>Usuarios</Text>
+          </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.btnLogout} onPress={handleLogout}>
@@ -79,7 +84,7 @@ export default function App() {
           {/* Adorno inferior verde de Figma */}
           <View style={styles.bottomShape} />
         </View>
-      </SafeAreaView>
+      </SafeAreaView> 
     );
   }
 
