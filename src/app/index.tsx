@@ -1,4 +1,5 @@
 import { useState } from 'react';
+
 import {
   Alert,
   SafeAreaView,
@@ -12,10 +13,11 @@ import {
 import UsuariosScreen from './usuarios';
 import ClientesScreen from './clientes';
 import ProductosScreen from './productos';
+import ComprasScreen from './compras';
 
 export default function App() {
   const [screen, setScreen] = useState<
-  'login' | 'menu' | 'usuarios' | 'clientes' | 'productos'
+  'login' | 'menu' | 'usuarios' | 'clientes' | 'productos' |'compras'
 >('login');
   
   // Estados para Login y Validaciones
@@ -52,7 +54,12 @@ export default function App() {
 
   if (screen === 'productos') {
   return <ProductosScreen onRegresar={() => setScreen('menu')} />;
-}
+  }
+
+  if (screen === 'compras') {
+    return <ComprasScreen onRegresar={() => setScreen('menu')}/>
+  }
+
   if (screen === 'menu') {
     return (
       <SafeAreaView style={styles.container}>
@@ -69,7 +76,8 @@ export default function App() {
               <Text style={styles.btnMenuOptionText}>Clientes</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.btnMenuOption}>
+            <TouchableOpacity style={styles.btnMenuOption}
+              onPress={() => setScreen('compras')}>
               <Text style={styles.btnMenuOptionText}>Compras</Text>
             </TouchableOpacity>
 
