@@ -9,9 +9,10 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
+import ClientesScreen from './clientes';
 
 export default function App() {
-  const [screen, setScreen] = useState<'login' | 'menu'>('login');
+  const [screen, setScreen] = useState<'login' | 'menu' | 'clientes'>('login');
   
   // Estados para Login y Validaciones
   const [usuario, setUsuario] = useState('');
@@ -38,6 +39,10 @@ export default function App() {
     setScreen('login');
   };
 
+  if (screen === 'clientes') {
+    return <ClientesScreen onRegresar={() => setScreen('menu')} />;
+  }
+
   if (screen === 'menu') {
     return (
       <SafeAreaView style={styles.container}>
@@ -48,7 +53,9 @@ export default function App() {
           <Text style={styles.menuTitle}>Menu</Text>
 
           <View style={styles.menuButtonsGroup}>
-            <TouchableOpacity style={styles.btnMenuOption}>
+            <TouchableOpacity
+              style={styles.btnMenuOption}
+              onPress={() => setScreen('clientes')}>
               <Text style={styles.btnMenuOptionText}>Clientes</Text>
             </TouchableOpacity>
 
