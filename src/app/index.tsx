@@ -74,7 +74,7 @@ if (screen === 'usuarios') {
           {/* Adorno inferior verde de Figma */}
           <View style={styles.bottomShape} />
         </View>
-      </SafeAreaView>
+      </SafeAreaView> 
     );
   }
 
