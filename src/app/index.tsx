@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import UsuariosScreen from './usuarios';
 import ClientesScreen from '../screen/ClientesScreen';
-import ProductosScreen from './productos';
+import ProductosScreen from '../screen/ProductosScreen';
 import ComprasScreen from './compras';
 
 export default function App() {
