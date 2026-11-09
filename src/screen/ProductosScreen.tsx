@@ -3,101 +3,48 @@ import {
   StyleSheet,
   Text,
   View,
-  TextInput,
   TouchableOpacity,
   FlatList,
   Alert,
 } from 'react-native';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
-import { db, auth } from '../config/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
-export default function ComprasScreen({ onVolver }: { onVolver: () => void }) {
-  const [total, setTotal] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [compras, setCompras] = useState<any[]>([]);
+export default function ProductosScreen({ onVolver }: { onVolver: () => void }) {
+  const [productos, setProductos] = useState<any[]>([]);
 
-  const cargarCompras = async () => {
+  const obtenerProductos = async () => {
     try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const q = query(collection(db, 'purchases'), where('userId', '==', user.uid));
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(collection(db, 'products'));
       const lista = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCompras(lista);
+      setProductos(lista);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
   };
 
   useEffect(() => {
-    cargarCompras();
+    obtenerProductos();
   }, []);
-
-  const registrarCompra = async () => {
-    if (!total.trim() || !descripcion.trim()) {
-      Alert.alert('Atención', 'Ingrese descripción y total.');
-      return;
-    }
-
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      await addDoc(collection(db, 'purchases'), {
-        total: parseFloat(total),
-        descripcion,
-        userId: user.uid,
-        timestamp: new Date().toISOString(),
-      });
-
-      Alert.alert('Éxito', 'Compra registrada en Firestore.');
-      setTotal('');
-      setDescripcion('');
-      cargarCompras();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Historial de Compras</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Descripción de la compra"
-        value={descripcion}
-        onChangeText={setDescripcion}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Total ($)"
-        keyboardType="numeric"
-        value={total}
-        onChangeText={setTotal}
-      />
-
-      <TouchableOpacity style={styles.button} onPress={registrarCompra}>
-        <Text style={styles.buttonText}>Registrar Compra</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.subtitle}>Transacciones Almacenadas:</Text>
+      <Text style={styles.title}>Inventario de Productos (Cloud)</Text>
 
       <FlatList
-        data={compras}
+        data={productos}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{item.descripcion}</Text>
-            <Text>Total: ${item.total}</Text>
-            <Text>Fecha: {new Date(item.timestamp).toLocaleDateString()}</Text>
+            <Text style={styles.cardTitle}>{item.nombre}</Text>
+            <Text>Precio: ${item.precio}</Text>
+            <Text>Stock disponible: {item.stock}</Text>
           </View>
         )}
       />
 
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: '#8C8C98', marginTop: 10 }]}
+        style={[styles.button, { backgroundColor: '#8C8C98', marginTop: 15 }]}
         onPress={onVolver}
       >
         <Text style={styles.buttonText}>Regresar al Menú</Text>
@@ -119,20 +66,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#333',
   },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#444',
-  },
-  input: {
+  card: {
     backgroundColor: '#FFF',
-    padding: 12,
+    padding: 15,
     borderRadius: 8,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: '#E0E0E0',
+  },
+  cardTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#2A3B2E',
   },
   button: {
     backgroundColor: '#4A5D4E',
@@ -144,18 +89,5 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
-  },
-  card: {
-    backgroundColor: '#FFF',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  cardTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    color: '#2A3B2E',
   },
 });

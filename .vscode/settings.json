@@ -4,5 +4,18 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
-  "cSpell.words": ["Regresar"]
+  "cSpell.words": [
+    "Almacenadas",
+    "Atención",
+    "Creacion",
+    "Descripción",
+    "editar",
+    "Éxito",
+    "firestore",
+    "gestion",
+    "Guardamos",
+    "Menú",
+    "Operador",
+    "Regresar"
+  ]
 }
