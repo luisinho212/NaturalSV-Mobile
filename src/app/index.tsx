@@ -1,5 +1,6 @@
 import { useState } from 'react';
-
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../config/firebase';
 import {
   Alert,
   SafeAreaView,
@@ -11,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import UsuariosScreen from './usuarios';
-import ClientesScreen from './clientes';
+import ClientesScreen from '../screen/ClientesScreen';
 import ProductosScreen from './productos';
 import ComprasScreen from './compras';
 
@@ -24,20 +25,48 @@ export default function App() {
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    if (!usuario.trim() || !password.trim()) {
-      Alert.alert('Error de Validación', 'Por favor ingrese su usuario y contraseña.');
-      return;
-    }
+  
+const handleLogin = async () => {
+  if (!usuario.trim() || !password.trim()) {
+    Alert.alert(
+      'Error',
+      'Ingrese su correo electrónico y contraseña.'
+    );
+    return;
+  }
 
-    if (password.length < 4) {
-      Alert.alert('Error de Validación', 'La contraseña debe tener al menos 4 caracteres.');
-      return;
-    }
+  try {
+    // Autenticación real contra Firebase
+    const resultado = await signInWithEmailAndPassword(
+      auth,
+      usuario.trim(),
+      password
+    );
 
-    // Si pasa la validación, navega al Menú
+    console.log(
+      'Usuario autenticado correctamente:',
+      resultado.user.email
+    );
+
+    // Mostrar el menú después de autenticar
     setScreen('menu');
-  };
+
+  } catch (error: any) {
+    console.error('Error de autenticación:', error);
+
+    const mensaje =
+      error.code === 'auth/invalid-credential'
+        ? 'Correo o contraseña incorrectos.'
+        : error.message;
+
+    if (typeof window !== 'undefined') {
+      window.alert(mensaje);
+    } else {
+      Alert.alert('Error de autenticación', mensaje);
+    }
+  }
+};
+
 
   const handleLogout = () => {
     setUsuario('');
@@ -49,8 +78,8 @@ export default function App() {
   }
 
   if (screen === 'clientes') {
-    return <ClientesScreen onRegresar={() => setScreen('menu')} />;
-  }
+  return <ClientesScreen onVolver={() => setScreen('menu')} />;
+}
 
   if (screen === 'productos') {
   return <ProductosScreen onRegresar={() => setScreen('menu')} />;
