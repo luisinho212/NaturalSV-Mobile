@@ -3,7 +3,7 @@ import { initializeAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCMIOhxwcXEqbAnie@m1mbyUIpwDNBYeuA",
+  apiKey: "AIzaSyCMIohxwcXEqbAnie0m1mbyUIpwDNBYeuA",
   authDomain: "naturalsv-mobile.firebaseapp.com",
   projectId: "naturalsv-mobile",
   storageBucket: "naturalsv-mobile.firebasestorage.app",
@@ -14,6 +14,5 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Inicialización limpia evitando el conflicto de tipos de persistencia en el editor
 export const auth = initializeAuth(app);
 export const db = getFirestore(app);
