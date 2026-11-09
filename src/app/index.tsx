@@ -14,7 +14,7 @@ import {
 import UsuariosScreen from './usuarios';
 import ClientesScreen from '../screen/ClientesScreen';
 import ProductosScreen from '../screen/ProductosScreen';
-import ComprasScreen from './compras';
+import ComprasScreen from '../screen/ComprasScreen';
 
 export default function App() {
   const [screen, setScreen] = useState<

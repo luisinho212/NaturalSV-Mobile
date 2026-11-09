@@ -11,7 +11,7 @@ import {
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 
-export default function ComprasScreen({ onVolver }: { onVolver: () => void }) {
+export default function ComprasScreen({ onRegresar }: { onRegresar: () => void }) {
   const [total, setTotal] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [compras, setCompras] = useState<any[]>([]);
@@ -98,7 +98,7 @@ export default function ComprasScreen({ onVolver }: { onVolver: () => void }) {
 
       <TouchableOpacity
         style={[styles.button, { backgroundColor: '#8C8C98', marginTop: 10 }]}
-        onPress={onVolver}
+        onPress={onRegresar}
       >
         <Text style={styles.buttonText}>Regresar al Menú</Text>
       </TouchableOpacity>
