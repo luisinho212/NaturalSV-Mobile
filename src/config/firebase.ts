@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { initializeAuth } from 'firebase/auth';
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import { getAuth, initializeAuth, type Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -12,9 +12,15 @@ const firebaseConfig = {
   measurementId: "G-B7MK7WJG9C"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Inicialización limpia evitando el conflicto de tipos de persistencia en el editor
-export const auth = initializeAuth(app);
+let auth: Auth;
+try {
+  auth = initializeAuth(app);
+} catch {
+  auth = getAuth(app);
+}
+
 export const db = getFirestore(app);
-
+export { auth };
+export default app;
