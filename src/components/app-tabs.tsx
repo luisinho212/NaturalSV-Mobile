@@ -1,6 +1,5 @@
 import { Colors } from '@/constants/theme';
 import { Tabs } from 'expo-router';
-import React from 'react';
 import { useColorScheme } from 'react-native';
 
 export default function AppTabs() {
@@ -20,13 +19,14 @@ export default function AppTabs() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'NaturalSV',
+          tabBarStyle: { display: 'none' },
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
+          href: null,
         }}
       />
       <Tabs.Screen

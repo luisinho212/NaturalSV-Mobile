@@ -1,8 +1,15 @@
+import { getApp } from 'firebase/app';
+import {
+  browserPopupRedirectResolver,
+  getAuth,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from 'firebase/auth';
 import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../config/firebase';
 import {
   Alert,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -11,82 +18,118 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import UsuariosScreen from './usuarios';
+import { auth } from '../config/firebase';
 import ClientesScreen from '../screen/ClientesScreen';
-import ProductosScreen from '../screen/ProductosScreen';
 import ComprasScreen from '../screen/ComprasScreen';
+import ProductosScreen from '../screen/ProductosScreen';
+import UsuariosScreen from './usuarios';
 
 export default function App() {
   const [screen, setScreen] = useState<
-  'login' | 'menu' | 'usuarios' | 'clientes' | 'productos' |'compras'
->('login');
-  
+    'login' | 'menu' | 'usuarios' | 'clientes' | 'productos' | 'compras'
+  >('login');
+
   // Estados para Login y Validaciones
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
 
-  
-const handleLogin = async () => {
-  if (!usuario.trim() || !password.trim()) {
-    Alert.alert(
-      'Error',
-      'Ingrese su correo electrónico y contraseña.'
-    );
-    return;
-  }
-
-  try {
-    // Autenticación real contra Firebase
-    const resultado = await signInWithEmailAndPassword(
-      auth,
-      usuario.trim(),
-      password
-    );
-
-    console.log(
-      'Usuario autenticado correctamente:',
-      resultado.user.email
-    );
-
-    // Mostrar el menú después de autenticar
-    setScreen('menu');
-
-  } catch (error: any) {
-    console.error('Error de autenticación:', error);
-
-    const mensaje =
-      error.code === 'auth/invalid-credential'
-        ? 'Correo o contraseña incorrectos.'
-        : error.message;
-
-    if (typeof window !== 'undefined') {
-      window.alert(mensaje);
+  const mostrarError = (titulo: string, mensaje: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(`${titulo}: ${mensaje}`);
     } else {
-      Alert.alert('Error de autenticación', mensaje);
+      Alert.alert(titulo, mensaje);
     }
-  }
-};
+  };
 
+  const handleLogin = async () => {
+    if (!usuario.trim() || !password.trim()) {
+      mostrarError(
+        'Error',
+        'Ingrese su correo electrónico y contraseña.'
+      );
+      return;
+    }
+
+    try {
+      // Autenticación real contra Firebase
+      const resultado = await signInWithEmailAndPassword(
+        auth,
+        usuario.trim(),
+        password
+      );
+
+      console.log(
+        'Usuario autenticado correctamente:',
+        resultado.user.email
+      );
+
+      // Mostrar el menú después de autenticar
+      setScreen('menu');
+    } catch (error: any) {
+      console.error('Error de autenticación:', error);
+
+      const mensaje =
+        error.code === 'auth/invalid-credential'
+          ? 'Correo o contraseña incorrectos.'
+          : error.message;
+
+      mostrarError('Error de autenticación', mensaje);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoadingGoogle(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      if (Platform.OS === 'web') {
+        const webAuth = getAuth(getApp());
+        const resultado = await signInWithPopup(
+          webAuth,
+          provider,
+          browserPopupRedirectResolver
+        );
+        console.log('Sesión Google iniciada:', resultado.user.email);
+        setScreen('menu');
+      } else {
+        mostrarError(
+          'Inicio con Google',
+          'Usa el inicio con correo y contraseña o configura el flujo nativo de Google.'
+        );
+      }
+    } catch (error: any) {
+      console.error('Error con Google:', error);
+      mostrarError(
+        'Error con Google',
+        error?.message || 'No se pudo iniciar sesión con Google.'
+      );
+    } finally {
+      setLoadingGoogle(false);
+    }
+  };
 
   const handleLogout = () => {
     setUsuario('');
     setPassword('');
     setScreen('login');
   };
+
   if (screen === 'usuarios') {
     return <UsuariosScreen onRegresar={() => setScreen('menu')} />;
   }
 
   if (screen === 'clientes') {
-  return <ClientesScreen onVolver={() => setScreen('menu')} />;
-}
+    return <ClientesScreen onVolver={() => setScreen('menu')} />;
+  }
 
   if (screen === 'productos') {
-  return <ProductosScreen onRegresar={() => setScreen('menu')} />;
+    return <ProductosScreen onRegresar={() => setScreen('menu')} />;
   }
 
   if (screen === 'compras') {
-    return <ComprasScreen onRegresar={() => setScreen('menu')}/>
+    return <ComprasScreen onRegresar={() => setScreen('menu')} />;
   }
 
   if (screen === 'menu') {
@@ -101,24 +144,31 @@ const handleLogin = async () => {
           <View style={styles.menuButtonsGroup}>
             <TouchableOpacity
               style={styles.btnMenuOption}
-              onPress={() => setScreen('clientes')}>
+              onPress={() => setScreen('clientes')}
+            >
               <Text style={styles.btnMenuOptionText}>Clientes</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.btnMenuOption}
-              onPress={() => setScreen('compras')}>
+            <TouchableOpacity
+              style={styles.btnMenuOption}
+              onPress={() => setScreen('compras')}
+            >
               <Text style={styles.btnMenuOptionText}>Compras</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.btnMenuOption}
-              onPress={() => setScreen('productos')}>
+              onPress={() => setScreen('productos')}
+            >
               <Text style={styles.btnMenuOptionText}>Productos</Text>
             </TouchableOpacity>
 
-          <TouchableOpacity style={styles.btnMenuOption} onPress={() => setScreen('usuarios')}>
-            <Text style={styles.btnMenuOptionText}>Usuarios</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.btnMenuOption}
+              onPress={() => setScreen('usuarios')}
+            >
+              <Text style={styles.btnMenuOptionText}>Usuarios</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.btnLogout} onPress={handleLogout}>
@@ -128,7 +178,7 @@ const handleLogin = async () => {
           {/* Adorno inferior verde de Figma */}
           <View style={styles.bottomShape} />
         </View>
-      </SafeAreaView> 
+      </SafeAreaView>
     );
   }
 
@@ -144,7 +194,9 @@ const handleLogin = async () => {
             <Text style={styles.brandTitle}>
               Natural<Text style={styles.brandSub}>SV</Text>
             </Text>
-            <Text style={styles.brandTagline}>SALUD • BIENESTAR • EQUILIBRIO</Text>
+            <Text style={styles.brandTagline}>
+              SALUD • BIENESTAR • EQUILIBRIO
+            </Text>
           </View>
 
           <Text style={styles.welcomeTitle}>Bienvenido</Text>
@@ -171,6 +223,20 @@ const handleLogin = async () => {
 
             <TouchableOpacity style={styles.btnLogin} onPress={handleLogin}>
               <Text style={styles.btnLoginText}>Iniciar sesion</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.btnGoogle,
+                loadingGoogle && styles.btnGoogleDisabled,
+              ]}
+              onPress={handleGoogleLogin}
+              disabled={loadingGoogle}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.btnGoogleText}>
+                {loadingGoogle ? 'Conectando...' : 'Continuar con Google'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -263,6 +329,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  btnGoogle: {
+    width: '90%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#55732F',
+    borderRadius: 15,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 12,
+    opacity: 1,
+  },
+  btnGoogleDisabled: {
+    opacity: 0.6,
+  },
+  btnGoogleText: {
+    color: '#55732F',
+    fontSize: 16,
+    fontWeight: '600',
   },
 
   // Estilos Pantalla Menú
