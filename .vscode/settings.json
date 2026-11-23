@@ -3,5 +3,36 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "cSpell.words": [
+    "Adorno",
+    "Almacenadas",
+    "Atención",
+    "autenticado",
+    "autenticar",
+    "BIENESTAR",
+    "Consultas",
+    "Creacion",
+    "Descripción",
+    "editar",
+    "electrónico",
+    "EQUILIBRIO",
+    "existencias",
+    "Éxito",
+    "firestore",
+    "gestion",
+    "gestiones",
+    "Guardamos",
+    "inventario",
+    "Inventarios",
+    "Isotipo",
+    "Marca",
+    "Menú",
+    "oliva",
+    "Operador",
+    "Pantalla",
+    "Proveedor",
+    "Regresar",
+    "SALUD"
+  ]
 }

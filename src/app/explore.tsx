@@ -49,11 +49,9 @@ export default function TabTwoScreen() {
               <ThemedView type="backgroundElement" style={styles.linkButton}>
                 <ThemedText type="link">Expo documentation</ThemedText>
                 <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
+                 name="link" size={12}
                 />
-              </ThemedView>
+              </ThemedView> 
             </Pressable>
           </ExternalLink>
         </ThemedView>
@@ -81,7 +79,7 @@ export default function TabTwoScreen() {
                 project.
               </ThemedText>
               <Image
-                source={require('@/assets/images/tutorial-web.png')}
+                source={require('../../assets/images/tutorial-web.png')}
                 style={styles.imageTutorial}
               />
             </ThemedView>

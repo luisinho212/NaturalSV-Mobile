@@ -1,3 +1,9 @@
+## Video 
+https://drive.google.com/file/d/1Y4YJlsh_NA2g94SjwPMgjjGyGYgaZ36T/view?usp=sharing
+
+Avanze fase 2 video
+https://udbedu-my.sharepoint.com/:p:/g/personal/as230282_alumno_udb_edu_sv/IQAnDTJnrbleT6_PlJjz_dCpAYicSsewur3Hh8Z8xlW4BHQ?rtime=XW1U-Bw-30g
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
@@ -54,3 +60,11 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Compras integradas con Firebase (Fase 3)
+
+El mÃ³dulo de compras registra, edita y elimina en Firestore `purchases` con `userId`,
+`creadoEn: serverTimestamp()` y escucha en tiempo real `onSnapshot`.
+La ruta `src/app/compras.tsx` reutiliza `src/screen/ComprasScreen.tsx`.
+Ver `docs/GUIA-JOSE-DEFENSA.md` para pruebas y defensa, y la integraciÃ³n
+web en https://github.com/contreraaaa/Natural-SV.
