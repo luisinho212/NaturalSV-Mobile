@@ -60,3 +60,11 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Compras integradas con Firebase (Fase 3)
+
+El mÃ³dulo de compras registra, edita y elimina en Firestore `purchases` con `userId`,
+`creadoEn: serverTimestamp()` y escucha en tiempo real `onSnapshot`.
+La ruta `src/app/compras.tsx` reutiliza `src/screen/ComprasScreen.tsx`.
+Ver `docs/GUIA-JOSE-DEFENSA.md` para pruebas y defensa, y la integraciÃ³n
+web en https://github.com/contreraaaa/Natural-SV.
