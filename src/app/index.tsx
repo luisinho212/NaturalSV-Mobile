@@ -1,10 +1,12 @@
 import { getApp } from 'firebase/app';
 import {
   browserPopupRedirectResolver,
+  createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signOut,
 } from 'firebase/auth';
 import { useState } from 'react';
 import {
@@ -32,6 +34,9 @@ export default function App() {
   // Estados para Login y Validaciones
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmarPassword, setConfirmarPassword] = useState('');
+  const [modoRegistro, setModoRegistro] = useState(false);
+  const [procesandoAcceso, setProcesandoAcceso] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 
   const mostrarError = (titulo: string, mensaje: string) => {
@@ -42,41 +47,77 @@ export default function App() {
     }
   };
 
-  const handleLogin = async () => {
-    if (!usuario.trim() || !password.trim()) {
-      mostrarError(
-        'Error',
-        'Ingrese su correo electrónico y contraseña.'
-      );
-      return;
-    }
 
-    try {
-      // Autenticación real contra Firebase
-      const resultado = await signInWithEmailAndPassword(
-        auth,
-        usuario.trim(),
-        password
-      );
+// Los usuarios de esta pantalla son de Firebase Authentication, no del mock web.
+const mensajeErrorAuth = (codigo?: string): string => {
+  switch (codigo) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Correo o contraseña incorrectos, o no existe una cuenta con ese correo.';
+    case 'auth/email-already-in-use':
+      return 'Este correo ya está registrado. Usa Iniciar sesión.';
+    case 'auth/invalid-email':
+      return 'El correo electrónico no es válido.';
+    case 'auth/weak-password':
+      return 'La contraseña es demasiado débil. Usa al menos 6 caracteres.';
+    case 'auth/operation-not-allowed':
+    case 'auth/configuration-not-found':
+      return 'El registro con correo está desactivado en Firebase. El responsable del proyecto debe activarlo en Authentication > Sign-in method.';
+    case 'auth/network-request-failed':
+      return 'No se pudo conectar a Firebase. Comprueba tu conexión a internet.';
+    case 'auth/too-many-requests':
+      return 'Demasiados intentos. Espera un momento y vuelve a intentarlo.';
+    case 'auth/user-disabled':
+      return 'Esta cuenta ha sido deshabilitada por el administrador.';
+    case 'auth/invalid-api-key':
+      return 'La configuración de Firebase no es válida. Revisa src/config/firebase.ts.';
+    default:
+      return `No se pudo autenticar. Código: ${codigo ?? 'desconocido'}.`;
+  }
+};
 
-      console.log(
-        'Usuario autenticado correctamente:',
-        resultado.user.email
-      );
+const handleLogin = async () => {
+  if (procesandoAcceso) return;
+  const correo = usuario.trim().toLowerCase();
+  if (!correo || !password) {
+    mostrarError('Campos requeridos', 'Ingresa tu correo electrónico y contraseña.');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+    mostrarError('Correo inválido', 'Escribe un correo real (por ejemplo, prueba@correo.com).');
+    return;
+  }
+  if (modoRegistro && (password.length < 6 || password !== confirmarPassword)) {
+    mostrarError(
+      'Revisa la contraseña',
+      password.length < 6
+        ? 'Firebase requiere una contraseña de al menos 6 caracteres.'
+        : 'Las dos contraseñas deben coincidir.'
+    );
+    return;
+  }
 
-      // Mostrar el menú después de autenticar
-      setScreen('menu');
-    } catch (error: any) {
-      console.error('Error de autenticación:', error);
+  setProcesandoAcceso(true);
+  try {
+    const resultado = modoRegistro
+      ? await createUserWithEmailAndPassword(auth, correo, password)
+      : await signInWithEmailAndPassword(auth, correo, password);
 
-      const mensaje =
-        error.code === 'auth/invalid-credential'
-          ? 'Correo o contraseña incorrectos.'
-          : error.message;
-
-      mostrarError('Error de autenticación', mensaje);
-    }
-  };
+    console.log('Autenticación correcta para:', resultado.user.uid);
+    setPassword('');
+    setConfirmarPassword('');
+    setScreen('menu');
+  } catch (error: unknown) {
+    const codigo = error && typeof error === 'object' && 'code' in error
+      ? String(error.code)
+      : undefined;
+    console.error('Firebase Authentication:', codigo);
+    mostrarError(modoRegistro ? 'Error al crear cuenta' : 'Error al iniciar sesión', mensajeErrorAuth(codigo));
+  } finally {
+    setProcesandoAcceso(false);
+  }
+};
 
   const handleGoogleLogin = async () => {
     setLoadingGoogle(true);
@@ -110,9 +151,18 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('No se pudo cerrar la sesión:', error);
+      mostrarError('Cerrar sesión', 'Hubo un problema cerrando la sesión en Firebase.');
+      return;
+    }
     setUsuario('');
     setPassword('');
+    setConfirmarPassword('');
+    setModoRegistro(false);
     setScreen('login');
   };
 
@@ -199,13 +249,15 @@ export default function App() {
             </Text>
           </View>
 
-          <Text style={styles.welcomeTitle}>Bienvenido</Text>
+          <Text style={styles.welcomeTitle}>{modoRegistro ? 'Crear cuenta de prueba' : 'Bienvenido'}</Text>
 
           {/* Formulario de Login */}
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Usuario"
+              placeholder="Correo electrónico"
+              keyboardType="email-address"
+              autoComplete="email"
               placeholderTextColor="#666"
               value={usuario}
               onChangeText={setUsuario}
@@ -221,11 +273,50 @@ export default function App() {
               onChangeText={setPassword}
             />
 
-            <TouchableOpacity style={styles.btnLogin} onPress={handleLogin}>
-              <Text style={styles.btnLoginText}>Iniciar sesion</Text>
+            {modoRegistro && (
+              <TextInput
+                style={styles.input}
+                placeholder="Confirmar contraseña"
+                placeholderTextColor="#666"
+                secureTextEntry
+                value={confirmarPassword}
+                onChangeText={setConfirmarPassword}
+              />
+            )}
+
+            <TouchableOpacity
+              style={[styles.btnLogin, procesandoAcceso && styles.btnGoogleDisabled]}
+              onPress={handleLogin}
+              disabled={procesandoAcceso}
+            >
+              <Text style={styles.btnLoginText}>
+                {procesandoAcceso
+                  ? 'Conectando con Firebase...'
+                  : modoRegistro ? 'Crear cuenta' : 'Iniciar sesión'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={styles.btnRegister}
+              onPress={() => {
+                setModoRegistro(!modoRegistro);
+                setPassword('');
+                setConfirmarPassword('');
+              }}
+              disabled={procesandoAcceso}
+            >
+              <Text style={styles.btnRegisterText}>
+                {modoRegistro ? 'Ya tengo cuenta: iniciar sesión' : '¿No tenés cuenta? Crear una para probar'}
+              </Text>
+            </TouchableOpacity>
+
+            {modoRegistro && (
+              <Text style={styles.helperText}>
+                La cuenta se crea en Firebase Authentication. Debe estar habilitado el acceso con correo y contraseña.
+              </Text>
+            )}
+
+            {!modoRegistro && <TouchableOpacity
               style={[
                 styles.btnGoogle,
                 loadingGoogle && styles.btnGoogleDisabled,
@@ -237,7 +328,7 @@ export default function App() {
               <Text style={styles.btnGoogleText}>
                 {loadingGoogle ? 'Conectando...' : 'Continuar con Google'}
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity>}
           </View>
         </View>
       </ScrollView>
@@ -329,6 +420,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  btnRegister: {
+    marginTop: 14,
+    width: '95%',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  btnRegisterText: {
+    color: '#44641F',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  helperText: {
+    width: '90%',
+    marginTop: 6,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#555',
   },
   btnGoogle: {
     width: '90%',
