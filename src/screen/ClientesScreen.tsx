@@ -1,129 +1,165 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Platform,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Alert,
-  Platform
+  View,
 } from 'react-native';
 
 import {
-  collection,
   addDoc,
-  getDocs,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
   query,
-  where
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 
-import { onAuthStateChanged } from 'firebase/auth';
-import type { User } from 'firebase/auth';
-
-import { db, auth } from '../config/firebase';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth, db } from '../config/firebase';
 
 type Cliente = {
   id: string;
   nombre: string;
   telefono: string;
   direccion: string;
+  correo?: string;
   userId: string;
-  fechaRegistro: string;
+  fechaRegistro?: string;
 };
 
 export default function ClientesScreen({
-  onVolver
+  onVolver,
 }: {
-  onVolver: () => void
+  onVolver: () => void;
 }) {
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [usuario, setUsuario] = useState<User | null>(null);
+  const [verificandoSesion, setVerificandoSesion] = useState(true);
 
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [usuario, setUsuario] = useState<User | null>(null);
+  const [correo, setCorreo] = useState('');
+
+  const [editId, setEditId] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState('');
 
-  const mostrarMensaje = (titulo: string, texto: string) => {
-    setMensaje(`${titulo}: ${texto}`);
+  const notificar = (titulo: string, detalle: string) => {
+    setMensaje(`${titulo}: ${detalle}`);
 
     if (Platform.OS !== 'web') {
-      Alert.alert(titulo, texto);
+      Alert.alert(titulo, detalle);
     }
   };
 
-  // Consultar los clientes del usuario autenticado
-  const cargarClientes = async (uid: string) => {
-    try {
-      const q = query(
-        collection(db, 'clients'),
-        where('userId', '==', uid)
-      );
-
-      const resultado = await getDocs(q);
-
-      const lista = resultado.docs.map(documento => ({
-        ...(documento.data() as Omit<Cliente, 'id'>),
-        id: documento.id
-      }));
-
-      setClientes(lista);
-
-    } catch (error: any) {
-      console.error('Error consultando clientes:', error);
-
-      mostrarMensaje(
-        'Error al consultar clientes',
-        error.message
-      );
-    }
-  };
-
-  // Detectar cambios de autenticación
+  // 1. Verificar autenticacion
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (user) => {
-        setUsuario(user);
-        setCargando(true);
-
-        if (user) {
-          await cargarClientes(user.uid);
-        } else {
-          setClientes([]);
-        }
-
-        setCargando(false);
-      }
-    );
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUsuario(user);
+      setVerificandoSesion(false);
+    });
 
     return () => unsubscribe();
   }, []);
 
-  // Registrar clientes en Firestore
-  const guardarCliente = async () => {
+  // 2. Consultar clientes en tiempo real
+  useEffect(() => {
+    if (!usuario) {
+      setClientes([]);
+      setCargando(false);
+      return;
+    }
 
-    if (
-      !nombre.trim() ||
-      !telefono.trim() ||
-      !direccion.trim()
-    ) {
-      mostrarMensaje(
-        'Atención',
-        'Complete todos los campos.'
+    setCargando(true);
+
+    const consulta = query(
+      collection(db, 'clients'),
+      where('userId', '==', usuario.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      consulta,
+      (snapshot) => {
+        const lista: Cliente[] = snapshot.docs.map((documento) => {
+          const data = documento.data();
+
+          return {
+            id: documento.id,
+            nombre: String(data.nombre ?? ''),
+            telefono: String(data.telefono ?? ''),
+            direccion: String(data.direccion ?? ''),
+            correo: String(data.correo ?? ''),
+            userId: String(data.userId ?? ''),
+            fechaRegistro: String(data.fechaRegistro ?? ''),
+          };
+        });
+
+        lista.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        setClientes(lista);
+        setCargando(false);
+      },
+      (error) => {
+        console.error('Error consultando clientes:', error);
+        setCargando(false);
+        notificar('Error', error.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [usuario]);
+
+  // 3. Limpiar formulario
+  const limpiarFormulario = () => {
+    setNombre('');
+    setTelefono('');
+    setDireccion('');
+    setCorreo('');
+    setEditId(null);
+  };
+
+  // 4. Registrar o actualizar cliente
+  const guardarCliente = async () => {
+    const nombreLimpio = nombre.trim();
+    const telefonoLimpio = telefono.trim();
+    const direccionLimpia = direccion.trim();
+    const correoLimpio = correo.trim().toLowerCase();
+
+    if (!nombreLimpio || !telefonoLimpio || !direccionLimpia) {
+      notificar(
+        'Campos requeridos',
+        'Ingresa nombre, telefono y direccion.'
       );
       return;
     }
 
+    if (!/^[0-9+\s()-]{7,20}$/.test(telefonoLimpio)) {
+      notificar('Telefono invalido', 'Verifica el numero telefonico.');
+      return;
+    }
+
+    if (
+      correoLimpio &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoLimpio)
+    ) {
+      notificar('Correo invalido', 'Ingresa un correo valido.');
+      return;
+    }
+
     if (!usuario) {
-      mostrarMensaje(
-        'Autenticación requerida',
-        'Debes iniciar sesión en Firebase Authentication antes de guardar clientes.'
-      );
+      notificar('Error', 'Debes iniciar sesion primero.');
       return;
     }
 
@@ -131,131 +167,239 @@ export default function ClientesScreen({
     setMensaje('');
 
     try {
-      await addDoc(collection(db, 'clients'), {
-        nombre: nombre.trim(),
-        telefono: telefono.trim(),
-        direccion: direccion.trim(),
-        userId: usuario.uid,
-        fechaRegistro: new Date().toISOString()
-      });
+      const datos = {
+        nombre: nombreLimpio,
+        telefono: telefonoLimpio,
+        direccion: direccionLimpia,
+        correo: correoLimpio,
+      };
 
-      setNombre('');
-      setTelefono('');
-      setDireccion('');
+      if (editId) {
+        await updateDoc(doc(db, 'clients', editId), datos);
+        notificar('Exito', 'Cliente actualizado correctamente.');
+      } else {
+        await addDoc(collection(db, 'clients'), {
+          ...datos,
+          userId: usuario.uid,
+          fechaRegistro: new Date().toISOString(),
+        });
 
-      await cargarClientes(usuario.uid);
+        notificar('Exito', 'Cliente registrado correctamente.');
+      }
 
-      mostrarMensaje(
-        'Éxito',
-        'Cliente registrado correctamente en Firestore.'
-      );
-
+      limpiarFormulario();
     } catch (error: any) {
       console.error('Error guardando cliente:', error);
-
-      mostrarMensaje(
-        'Error al guardar cliente',
-        error.message
-      );
-
+      notificar('Error', error.message);
     } finally {
       setGuardando(false);
     }
   };
 
+  // 5. Cargar cliente para editar
+  const editarCliente = (cliente: Cliente) => {
+    setEditId(cliente.id);
+    setNombre(cliente.nombre);
+    setTelefono(cliente.telefono);
+    setDireccion(cliente.direccion);
+    setCorreo(cliente.correo ?? '');
+    setMensaje('');
+  };
+
+  // 6. Eliminar cliente en Firestore
+  const eliminarCliente = async (id: string) => {
+    if (!usuario) {
+      notificar('Error', 'Debes iniciar sesion primero.');
+      return;
+    }
+
+    setEliminandoId(id);
+
+    try {
+      await deleteDoc(doc(db, 'clients', id));
+
+      if (editId === id) {
+        limpiarFormulario();
+      }
+
+      notificar('Exito', 'Cliente eliminado correctamente.');
+    } catch (error: any) {
+      console.error('Error eliminando cliente:', error);
+      notificar('Error', error.message);
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
+  // 7. Confirmacion antes de eliminar
+  const confirmarEliminar = (cliente: Cliente) => {
+    if (Platform.OS === 'web') {
+      if (
+        typeof window !== 'undefined' &&
+        window.confirm(`¿Eliminar al cliente ${cliente.nombre}?`)
+      ) {
+        void eliminarCliente(cliente.id);
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Eliminar cliente',
+      `¿Deseas eliminar a ${cliente.nombre}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => void eliminarCliente(cliente.id),
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Gestion de Clientes</Text>
 
-      <Text style={styles.title}>
-        Gestión de Clientes (Firestore)
-      </Text>
-
-      {cargando ? (
-        <Text>Verificando sesión de Firebase...</Text>
+      {verificandoSesion ? (
+        <ActivityIndicator color="#3E5F2A" />
       ) : usuario ? (
         <Text style={styles.estado}>
-          Usuario autenticado: {usuario.email || usuario.uid}
+          Usuario: {usuario.email || usuario.uid}
         </Text>
       ) : (
         <Text style={styles.aviso}>
-          No hay una sesión activa de Firebase.
-          Inicia sesión antes de registrar clientes.
+          Inicia sesion para gestionar clientes.
         </Text>
       )}
+
+      <Text style={styles.subtitle}>
+        {editId ? 'Editar cliente' : 'Registrar cliente'}
+      </Text>
 
       <TextInput
         style={styles.input}
         placeholder="Nombre del cliente"
         value={nombre}
         onChangeText={setNombre}
+        editable={!guardando}
       />
 
       <TextInput
         style={styles.input}
-        placeholder="Teléfono"
+        placeholder="Telefono"
         keyboardType="phone-pad"
         value={telefono}
         onChangeText={setTelefono}
+        editable={!guardando}
       />
 
       <TextInput
         style={styles.input}
-        placeholder="Dirección"
+        placeholder="Direccion"
         value={direccion}
         onChangeText={setDireccion}
+        editable={!guardando}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Correo electronico (opcional)"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        value={correo}
+        onChangeText={setCorreo}
+        editable={!guardando}
       />
 
       <TouchableOpacity
         style={[
           styles.button,
-          (guardando || cargando) && styles.disabled
+          (guardando || !usuario) && styles.disabled,
         ]}
         onPress={guardarCliente}
-        disabled={guardando || cargando}
+        disabled={guardando || !usuario}
       >
         <Text style={styles.buttonText}>
-          {guardando ? 'Guardando...' : 'Guardar Cliente'}
+          {guardando
+            ? 'Guardando...'
+            : editId
+              ? 'Actualizar cliente'
+              : 'Guardar cliente'}
         </Text>
       </TouchableOpacity>
 
-      {mensaje !== '' && (
-        <Text style={styles.mensaje}>
-          {mensaje}
-        </Text>
+      {editId && (
+        <TouchableOpacity
+          style={[styles.button, styles.cancelButton]}
+          onPress={() => {
+            limpiarFormulario();
+            setMensaje('');
+          }}
+          disabled={guardando}
+        >
+          <Text style={styles.buttonText}>Cancelar edicion</Text>
+        </TouchableOpacity>
       )}
 
-      <Text style={styles.subtitle}>
-        Clientes Registrados:
-      </Text>
+      {mensaje !== '' && (
+        <Text style={styles.mensaje}>{mensaje}</Text>
+      )}
 
-      <FlatList
-        data={clientes}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <Text>
-            No hay clientes registrados para este usuario.
-          </Text>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>
-              {item.nombre}
+      <Text style={styles.subtitle}>Clientes registrados</Text>
+
+      {cargando ? (
+        <ActivityIndicator size="large" color="#3E5F2A" />
+      ) : (
+        <FlatList
+          style={styles.lista}
+          data={clientes}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <Text style={styles.vacio}>
+              No hay clientes registrados.
             </Text>
-            <Text>Tel: {item.telefono}</Text>
-            <Text>Dir: {item.direccion}</Text>
-          </View>
-        )}
-      />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{item.nombre}</Text>
+              <Text>Telefono: {item.telefono}</Text>
+              <Text>Direccion: {item.direccion}</Text>
+
+              {!!item.correo && (
+                <Text>Correo: {item.correo}</Text>
+              )}
+
+              <View style={styles.acciones}>
+                <TouchableOpacity
+                  onPress={() => editarCliente(item)}
+                  disabled={guardando || eliminandoId !== null}
+                >
+                  <Text style={styles.editar}>Editar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => confirmarEliminar(item)}
+                  disabled={guardando || eliminandoId !== null}
+                >
+                  <Text style={styles.eliminar}>
+                    {eliminandoId === item.id
+                      ? 'Eliminando...'
+                      : 'Eliminar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        />
+      )}
 
       <TouchableOpacity
         style={[styles.button, styles.backButton]}
         onPress={onVolver}
       >
-        <Text style={styles.buttonText}>
-          Regresar al Menú
-        </Text>
+        <Text style={styles.buttonText}>Regresar al menu</Text>
       </TouchableOpacity>
-
     </View>
   );
 }
@@ -264,73 +408,97 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#F4F4F0'
+    backgroundColor: '#F4F4F0',
   },
   title: {
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: 'bold',
-    marginBottom: 15,
+    color: '#3E5F2A',
     textAlign: 'center',
-    color: '#333'
-  },
-  estado: {
-    color: '#2A6B3C',
-    marginBottom: 15
-  },
-  aviso: {
-    color: '#B45309',
-    marginBottom: 15,
-    fontWeight: 'bold'
-  },
-  input: {
-    backgroundColor: '#FFF',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#DDD'
-  },
-  button: {
-    backgroundColor: '#4A5D4E',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  disabled: {
-    opacity: 0.5
-  },
-  buttonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16
-  },
-  mensaje: {
-    marginTop: 12,
-    marginBottom: 8,
-    color: '#333'
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#444'
+    color: '#3E5F2A',
+    marginVertical: 12,
   },
-  card: {
+  estado: {
+    color: '#2A6B3C',
+    marginBottom: 8,
+  },
+  aviso: {
+    color: '#B45309',
+    marginBottom: 10,
+  },
+  input: {
     backgroundColor: '#FFF',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
+    padding: 11,
+    borderRadius: 10,
+    marginBottom: 9,
     borderWidth: 1,
-    borderColor: '#E0E0E0'
+    borderColor: '#A3B18A',
   },
-  cardTitle: {
+  button: {
+    backgroundColor: '#3E5F2A',
+    padding: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 9,
+  },
+  buttonText: {
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: 'bold',
-    fontSize: 16,
-    color: '#2A3B2E'
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  cancelButton: {
+    backgroundColor: '#B45309',
   },
   backButton: {
     backgroundColor: '#8C8C98',
-    marginTop: 10
-  }
+    marginTop: 10,
+  },
+  lista: {
+    flex: 1,
+  },
+  card: {
+    backgroundColor: '#FFF',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#DDD',
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#3E5F2A',
+    marginBottom: 5,
+  },
+  acciones: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 15,
+  },
+  editar: {
+    color: '#1E56A0',
+    fontWeight: 'bold',
+  },
+  eliminar: {
+    color: '#B02A37',
+    fontWeight: 'bold',
+  },
+  mensaje: {
+    color: '#333',
+    marginVertical: 8,
+    textAlign: 'center',
+  },
+  vacio: {
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 20,
+  },
 });
