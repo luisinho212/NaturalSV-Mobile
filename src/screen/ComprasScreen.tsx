@@ -1,161 +1,155 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Alert,
-} from 'react-native';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
-import { db, auth } from '../config/firebase';
+  View,
+} from "react-native";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "../config/firebase";
 
-export default function ComprasScreen({ onRegresar }: { onRegresar: () => void }) {
-  const [total, setTotal] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [compras, setCompras] = useState<any[]>([]);
+export interface CompraItem {
+  id: string;
+  cliente: string;
+  detalle: string;
+  total: number;
+}
 
-  const cargarCompras = async () => {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const q = query(collection(db, 'purchases'), where('userId', '==', user.uid));
-      const querySnapshot = await getDocs(q);
-      const lista = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCompras(lista);
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
+export default function ComprasScreen() {
+  const [compras, setCompras] = useState<CompraItem[]>([]);
+  const [cliente, setCliente] = useState("");
+  const [detalle, setDetalle] = useState("");
+  const [total, setTotal] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    cargarCompras();
+    const q = query(collection(db, "compras"), orderBy("cliente", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const rows: CompraItem[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        cliente: String(d.data().cliente ?? ""),
+        detalle: String(d.data().detalle ?? ""),
+        total: Number(d.data().total ?? 0),
+      }));
+      setCompras(rows);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   const registrarCompra = async () => {
-    if (!total.trim() || !descripcion.trim()) {
-      Alert.alert('Atención', 'Ingrese descripción y total.');
+    const monto = Number(total);
+    if (!cliente.trim() || !detalle.trim() || Number.isNaN(monto) || monto <= 0) {
+      Alert.alert("Datos incompletos", "Ingresa cliente, detalle y total mayor que 0.");
       return;
     }
 
     try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      await addDoc(collection(db, 'purchases'), {
-        total: parseFloat(total),
-        descripcion,
-        userId: user.uid,
-        timestamp: new Date().toISOString(),
+      await addDoc(collection(db, "compras"), {
+        cliente: cliente.trim(),
+        detalle: detalle.trim(),
+        total: monto,
+        creadoEn: serverTimestamp(),
       });
-
-      Alert.alert('Éxito', 'Compra registrada en Firestore.');
-      setTotal('');
-      setDescripcion('');
-      cargarCompras();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
+      setCliente("");
+      setDetalle("");
+      setTotal("");
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "No se pudo registrar la compra.");
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Historial de Compras</Text>
-
+      <Text style={styles.title}>Registro de Compras</Text>
       <TextInput
         style={styles.input}
-        placeholder="Descripción de la compra"
-        value={descripcion}
-        onChangeText={setDescripcion}
+        placeholder="Cliente"
+        value={cliente}
+        onChangeText={setCliente}
       />
       <TextInput
         style={styles.input}
-        placeholder="Total ($)"
+        placeholder="Productos / Detalle de compra"
+        value={detalle}
+        onChangeText={setDetalle}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Total (USD)"
         keyboardType="numeric"
         value={total}
         onChangeText={setTotal}
       />
-
-      <TouchableOpacity style={styles.button} onPress={registrarCompra}>
-        <Text style={styles.buttonText}>Registrar Compra</Text>
+      <TouchableOpacity style={styles.btn} onPress={registrarCompra}>
+        <Text style={styles.btnText}>Registrar Compra</Text>
       </TouchableOpacity>
 
-      <Text style={styles.subtitle}>Transacciones Almacenadas:</Text>
-
-      <FlatList
-        data={compras}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{item.descripcion}</Text>
-            <Text>Total: ${item.total}</Text>
-            <Text>Fecha: {new Date(item.timestamp).toLocaleDateString()}</Text>
-          </View>
-        )}
-      />
-
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: '#8C8C98', marginTop: 10 }]}
-        onPress={onRegresar}
-      >
-        <Text style={styles.buttonText}>Regresar al Menú</Text>
-      </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={compras}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>{item.cliente}</Text>
+                <Text>{item.detalle} • Total: ${item.total.toFixed(2)}</Text>
+              </View>
+              <TouchableOpacity onPress={() => deleteDoc(doc(db, "compras", item.id))}>
+                <Text style={styles.del}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#F4F4F0',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#444',
-  },
+  container: { flex: 1, padding: 16, backgroundColor: "#F6F5F0" },
+  title: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
   input: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#DDD",
+  },
+  btn: {
+    backgroundColor: "#3E5F2A",
     padding: 12,
     borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#DDD',
+    alignItems: "center",
+    marginBottom: 12,
   },
-  button: {
-    backgroundColor: '#4A5D4E',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
+  btnText: { color: "#FFF", fontWeight: "700" },
   card: {
-    backgroundColor: '#FFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
     padding: 12,
     borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    marginBottom: 8,
+    gap: 10,
   },
-  cardTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    color: '#2A3B2E',
-  },
+  name: { fontWeight: "700", fontSize: 15 },
+  del: { color: "#B02A37", fontWeight: "600" },
 });

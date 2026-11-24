@@ -1,164 +1,253 @@
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import React, { useState } from 'react';
 import {
-  SafeAreaView,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { auth, db } from '../config/firebase';
+} from "react-native";
+import { db } from "../config/firebase";
 
-export default function UsuariosScreen({ onRegresar }: { onRegresar?: () => void }) {
-  const [vista, setVista] = useState<'registrar' | 'gestion' | 'editar'>('registrar');
+export interface UsuarioItem {
+  id: string;
+  nombre: string;
+  correo: string;
+  rol: string;
+  activo: boolean;
+}
 
-  // Estados del formulario
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [rol, setRol] = useState('Operador'); // Nuevo estado para el rol
+interface UsuariosScreenProps {
+  onVolver?: () => void;
+}
 
-  const handleAuthAction = async () => {
-    if (!email.trim() || !password.trim()) {
-      alert('Error: Por favor complete todos los campos requeridos.');
+export default function UsuariosScreen({ onVolver }: UsuariosScreenProps) {
+  const [usuarios, setUsuarios] = useState<UsuarioItem[]>([]);
+  const [nombre, setNombre] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [rol, setRol] = useState("Operador");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, "usuarios"), orderBy("nombre", "asc"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const rows: UsuarioItem[] = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            nombre: String(data.nombre ?? ""),
+            correo: String(data.correo ?? ""),
+            rol: String(data.rol ?? "Operador"),
+            activo: Boolean(data.activo ?? true),
+          };
+        });
+        setUsuarios(rows);
+        setLoading(false);
+      },
+      (err) => {
+        console.error(err);
+        Alert.alert("Error", "No se pudieron cargar los usuarios.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const limpiarFormulario = () => {
+    setNombre("");
+    setCorreo("");
+    setRol("Operador");
+    setEditId(null);
+  };
+
+  const guardarUsuario = async () => {
+    if (!nombre.trim() || !correo.trim()) {
+      Alert.alert("Campos requeridos", "Ingresa nombre y correo.");
       return;
     }
+
+    setSaving(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // Guardamos el rol seleccionado en Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        nombre: nombre,
-        email: email,
-        rol: rol, 
-        fechaCreacion: new Date().toISOString()
-      });
-      
-      alert('Éxito: Usuario registrado como ' + rol + ' en Firestore.');
-      setVista('gestion');
-    } catch (error: any) {
-      alert('Error de Autenticación: ' + error.message);
+      if (editId) {
+        await updateDoc(doc(db, "usuarios", editId), {
+          nombre: nombre.trim(),
+          correo: correo.trim().toLowerCase(),
+          rol: rol.trim() || "Operador",
+        });
+        Alert.alert("Éxito", "Usuario actualizado correctamente.");
+      } else {
+        await addDoc(collection(db, "usuarios"), {
+          nombre: nombre.trim(),
+          correo: correo.trim().toLowerCase(),
+          rol: rol.trim() || "Operador",
+          activo: true,
+          creadoEn: serverTimestamp(),
+        });
+        Alert.alert("Éxito", "Usuario agregado correctamente.");
+      }
+      limpiarFormulario();
+    } catch (err: unknown) {
+      console.error(err);
+      Alert.alert("Error", "No se pudo guardar el usuario.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Función para cambiar el rol al tocar la caja
-  const alternarRol = () => {
-    setRol(rol === 'Operador' ? 'Administrador' : 'Operador');
+  const eliminarUsuario = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "usuarios", id));
+      Alert.alert("Éxito", "Usuario eliminado.");
+    } catch (err: unknown) {
+      console.error(err);
+      Alert.alert("Error", "No se pudo eliminar el usuario.");
+    }
   };
 
-  if (vista === 'registrar') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.headerShape} />
-        <Text style={styles.title}>Registrar usuario</Text>
-        
-        <View style={styles.inputBox}>
-          <TextInput 
-            style={styles.inputText} 
-            placeholder="Nombre completo" 
-            placeholderTextColor="#888"
-            value={nombre} 
-            onChangeText={setNombre} 
-          />
-        </View>
-        <View style={styles.inputBox}>
-          <TextInput 
-            style={styles.inputText} 
-            placeholder="Correo (User)" 
-            placeholderTextColor="#888"
-            autoCapitalize="none"
-            value={email} 
-            onChangeText={setEmail} 
-          />
-        </View>
-        <View style={styles.inputBox}>
-          <TextInput 
-            style={styles.inputText} 
-            placeholder="Password" 
-            placeholderTextColor="#888"
-            secureTextEntry 
-            value={password} 
-            onChangeText={setPassword} 
-          />
-        </View>
-        
-        {/* Caja de Rol convertida en botón interactivo */}
-        <TouchableOpacity style={styles.inputBox} onPress={alternarRol}>
-          <Text style={styles.inputText}>Rol: {rol} 🔄 (Toca para cambiar)</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.btnSecondary} onPress={handleAuthAction}>
-          <Text style={styles.btnSecondaryText}>Guardar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.btnSecondary, { marginVertical: 8 }]} onPress={() => setVista('gestion')}>
-          <Text style={styles.btnSecondaryText}>Gestionar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnSecondary} onPress={onRegresar}>
-          <Text style={styles.btnSecondaryText}>Regresar</Text>
-        </TouchableOpacity>
-        <View style={styles.bottomShape} />
-      </SafeAreaView>
-    );
-  }
-
-  if (vista === 'gestion') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.headerShape} />
-        <Text style={styles.title}>Gestion usuarios</Text>
-        <View style={styles.listCard}>
-          <Text style={styles.itemText}>Usuario 2</Text>
-          <Text style={styles.itemText}>Usuario 3</Text>
-        </View>
-        <TouchableOpacity style={styles.btnSecondary} onPress={() => setVista('registrar')}>
-          <Text style={styles.btnSecondaryText}>Guardar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.btnSecondary, { marginVertical: 8 }]} onPress={() => setVista('editar')}>
-          <Text style={styles.btnSecondaryText}>Modificar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnSecondary} onPress={() => setVista('registrar')}>
-          <Text style={styles.btnSecondaryText}>Eliminar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.btnSecondary, { marginTop: 8 }]} onPress={() => setVista('registrar')}>
-          <Text style={styles.btnSecondaryText}>Regresar</Text>
-        </TouchableOpacity>
-        <View style={styles.bottomShape} />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.headerShape} />
-      <Text style={styles.title}>Editar usuario</Text>
-      <View style={styles.inputBox}><Text style={styles.inputText}>Nombre</Text></View>
-      <View style={styles.inputBox}><Text style={styles.inputText}>User</Text></View>
-      <View style={styles.inputBox}><Text style={styles.inputText}>Password</Text></View>
-      <View style={styles.inputBox}><Text style={styles.inputText}>Rol ▼</Text></View>
-      <TouchableOpacity style={styles.btnSecondary} onPress={() => setVista('gestion')}>
-        <Text style={styles.btnSecondaryText}>Guardar</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Gestión de Usuarios</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Nombre completo"
+        placeholderTextColor="#8C8C98"
+        value={nombre}
+        onChangeText={setNombre}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Correo electrónico"
+        placeholderTextColor="#8C8C98"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        value={correo}
+        onChangeText={setCorreo}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Rol (Ej. Administrador, Operador)"
+        placeholderTextColor="#8C8C98"
+        value={rol}
+        onChangeText={setRol}
+      />
+
+      <TouchableOpacity
+        style={styles.btn}
+        onPress={guardarUsuario}
+        disabled={saving}
+      >
+        {saving ? (
+          <ActivityIndicator color="#FFF" />
+        ) : (
+          <Text style={styles.btnText}>
+            {editId ? "Actualizar Usuario" : "Agregar Usuario"}
+          </Text>
+        )}
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.btnSecondary, { marginTop: 10 }]} onPress={() => setVista('gestion')}>
-        <Text style={styles.btnSecondaryText}>Regresar</Text>
-      </TouchableOpacity>
-      <View style={styles.bottomShape} />
-    </SafeAreaView>
+
+      {editId && (
+        <TouchableOpacity
+          style={[styles.btn, styles.cancelBtn]}
+          onPress={limpiarFormulario}
+        >
+          <Text style={styles.btnText}>Cancelar Edición</Text>
+        </TouchableOpacity>
+      )}
+
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 20 }} size="large" color="#3E5F2A" />
+      ) : (
+        <FlatList
+          data={usuarios}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>{item.nombre}</Text>
+                <Text>
+                  {item.correo} · {item.rol}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditId(item.id);
+                  setNombre(item.nombre);
+                  setCorreo(item.correo);
+                  setRol(item.rol);
+                }}
+              >
+                <Text style={styles.edit}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => eliminarUsuario(item.id)}>
+                <Text style={styles.del}>Borrar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      )}
+
+      {onVolver && (
+        <TouchableOpacity
+          style={[styles.btn, styles.backBtn]}
+          onPress={onVolver}
+        >
+          <Text style={styles.btnText}>Regresar al Menú</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EBE5D8', alignItems: 'center', paddingVertical: 35 },
-  headerShape: { position: 'absolute', top: 0, left: 0, right: 0, height: 100, backgroundColor: '#A3B18A', borderBottomRightRadius: 80, opacity: 0.6 },
-  bottomShape: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, backgroundColor: '#A3B18A', borderTopLeftRadius: 80, opacity: 0.6 },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#000', textAlign: 'center', marginVertical: 15, zIndex: 1 },
-  inputBox: { width: '80%', maxWidth: 400, backgroundColor: '#D9D9D9', borderRadius: 15, paddingVertical: 12, paddingHorizontal: 20, marginBottom: 12, zIndex: 1 },
-  inputText: { fontSize: 16, color: '#333' },
-  listCard: { width: '80%', maxWidth: 400, backgroundColor: '#D9D9D9', borderRadius: 10, padding: 15, marginBottom: 15, alignItems: 'center', zIndex: 1 },
-  itemText: { fontSize: 18, fontWeight: 'bold', color: '#000', marginVertical: 4 },
-  btnSecondary: { width: '50%', maxWidth: 250, backgroundColor: '#8C8C98', borderRadius: 12, paddingVertical: 9, alignItems: 'center', zIndex: 1 },
-  btnSecondaryText: { fontSize: 16, fontWeight: 'bold', color: '#FFF' },
+  container: { flex: 1, padding: 16, backgroundColor: "#F6F5F0" },
+  title: { fontSize: 20, fontWeight: "700", marginBottom: 12, color: "#333" },
+  input: {
+    backgroundColor: "#FFF",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#DDD",
+  },
+  btn: {
+    backgroundColor: "#3E5F2A",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  cancelBtn: { backgroundColor: "#6C757D" },
+  backBtn: { backgroundColor: "#8C8C98", marginTop: 10 },
+  btnText: { color: "#FFF", fontWeight: "700" },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 10,
+  },
+  name: { fontWeight: "700", fontSize: 15 },
+  edit: { color: "#1E56A0", fontWeight: "600" },
+  del: { color: "#B02A37", fontWeight: "600" },
 });
