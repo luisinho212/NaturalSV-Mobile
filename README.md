@@ -5,6 +5,11 @@
 * **Video Fase 1 / Demo:** https://drive.google.com/file/d/1Y4YJlsh_NA2g94SjwPMgjjGyGYgaZ36T/view?usp=sharing[cite: 13]
 Avanze fase 2 video
 https://udbedu-my.sharepoint.com/:p:/g/personal/as230282_alumno_udb_edu_sv/IQAnDTJnrbleT6_PlJjz_dCpAYicSsewur3Hh8Z8xlW4BHQ?rtime=XW1U-Bw-30g
+
+Avance Etapa FINAL 3 
+https://udbedu-my.sharepoint.com/:p:/g/personal/as230282_alumno_udb_edu_sv/IQAnDTJnrbleT6_PlJjz_dCpAYicSsewur3Hh8Z8xlW4BHQ?rtime=_tXvc0RM30g
+Enlace con presentación y explicación por parte de cada integrante sobre funcionamiento de la aplicación.
+
 ## Mockups (Diseño Figma)
 
 | Inicio de Sesión | Menú Principal |
